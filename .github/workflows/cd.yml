@@ -1,4 +1,4 @@
-name: Deploy 
+name: CD Pipeline
 
 on:
   push:
@@ -7,24 +7,34 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Set Up SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy to Server
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          cd /home/ubuntu/fastapi-book-project || exit 1
-          git pull origin main
-          source venv/bin/activate
-          pip install -r requirements.txt
-          systemctl restart fastapi
-          EOF
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/${{ secrets.SSH_USER }}/fastapi-book-project || exit
+            
+            # Pull the latest code
+            git pull origin main
+            
+            # Activate virtual environment safely
+            if [ -d "venv" ]; then
+              source venv/bin/activate
+            else
+              python3 -m venv venv
+              source venv/bin/activate
+            fi
+
+            # Install dependencies
+            pip install -r requirements.txt
+            
+            # Restart FastAPI
+            if systemctl list-units --full -all | grep -q "fastapi.service"; then
+              sudo systemctl restart fastapi
+            else
+              pkill -f uvicorn || true
+              nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+            fi
