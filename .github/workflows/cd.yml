@@ -1,4 +1,4 @@
-name: Deploy 
+name: Deploy  
 
 on:
   push:
@@ -15,14 +15,19 @@ jobs:
       - name: Set Up SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf "%s\n" "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Test SSH Connection
+        run: ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH Connection Successful'"
 
       - name: Deploy to Server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          cd /hng/fastapi
+          cd /hng/fastapi || exit 1
+          git remote set-url origin https://github.com/bhig-sheydi/fastapi-book-project.git
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes"
           git pull origin main
           source venv/bin/activate
           pip install -r requirements.txt
