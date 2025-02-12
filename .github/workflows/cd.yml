@@ -12,19 +12,29 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}  # Fixed: Using SSH_USER instead of SSH_USERNAME
-          key: ${{ secrets.SSH_PRIVATE_KEY }}  # Fixed: Using SSH_PRIVATE_KEY instead of password
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/${{ secrets.SSH_USER }}/fastapi-book-project || exit
-
+            
             # Pull the latest code
             git pull origin main
-
-            # Activate virtual environment (if available)
-            source venv/bin/activate
+            
+            # Activate virtual environment safely
+            if [ -d "venv" ]; then
+              source venv/bin/activate
+            else
+              python3 -m venv venv
+              source venv/bin/activate
+            fi
 
             # Install dependencies
             pip install -r requirements.txt
-
-            # Restart FastAPI app
-            sudo systemctl restart fastapi
+            
+            # Restart FastAPI
+            if systemctl list-units --full -all | grep -q "fastapi.service"; then
+              sudo systemctl restart fastapi
+            else
+              pkill -f uvicorn || true
+              nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+            fi
