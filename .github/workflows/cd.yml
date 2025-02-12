@@ -22,9 +22,9 @@ jobs:
       - name: Deploy to Server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          cd /ubuntu/fastapi-app
+          cd /home/ubuntu/fastapi-book-project || exit 1
           git pull origin main
           source venv/bin/activate
           pip install -r requirements.txt
-          systemctl restart fastapi-app
+          systemctl restart fastapi
           EOF
